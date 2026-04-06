@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Store Signal — Purplle Retail Audit</title>
+  <meta name="description" content="Purplle retail experience audit form" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+
+    /* ── Design tokens ── */
+    :root {
+      --bg:      #FFFFFF;
+      --ink:     #111111;
+      --accent:  #C4B5FD;
+      --muted:   #777777;
+      --border:  #CCCCCC;
+      --surface: #FFFFFF;
+      --radius:  4px;
+    }
+
+    body {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+      font-weight: 400;
+      letter-spacing: 0.025em;
+      -webkit-font-smoothing: antialiased;
+    }
+    #root { min-height: 100vh; }
+
+    input, select, textarea, button {
+      font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      font-weight: 400;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      color: var(--muted);
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(196,181,253,0.3);
+    }
+    textarea { resize: vertical; line-height: 1.6; }
+    button { cursor: pointer; }
+
+    .store-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .store-card:hover {
+      border-color: var(--accent);
+      background: #f3f0ff;
+    }
+
+    @media (max-width: 600px) {
+      body { background: var(--bg); }
+    }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+const { useState } = React;
+const ACCENT   = "#C4B5FD";   // light lavender
+const INK      = "#111111";   // nearly black
+const BG       = "#EEEEEE";   // almost white
+const SURFACE  = "#FFFFFF";
+const BORDER   = "#CCCCCC";
+const MUTED    = "#777777";
+
+// ─────────────────────────────────────────────────────────────
+// CONFIGURATION — update these before deploying
+// ─────────────────────────────────────────────────────────────
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz76Wp5tYAFyINPrPRrnZJx9kuNuWNBquwvRC_rfGWC8z92wCq73_IXxZGa-V3KGJywuQ/exec";
+// Sheet names must match exactly what you create in Google Sheets
+const SHEET_NAMES = {
+  purplle:    "Retail Audit - Purplle",
+  multibrand: "Retail Audit - Multibrand",
+  competitor: "Retail Audit - Competitor",
+};
+// ─────────────────────────────────────────────────────────────
+
+const STORE_CATEGORIES = [
+  { id: "purplle",    label: "Purplle Store",           description: "A standalone Purplle retail outlet",           sheet: SHEET_NAMES.purplle },
+  { id: "multibrand", label: "Other multibrand stores",  description: "e.g. Shoppers Stop, Lifestyle, Health & Glow", sheet: SHEET_NAMES.multibrand },
+  { id: "competitor", label: "Standalone stores",        description: "e.g. Nykaa, Sephora, Sugar",                  sheet: SHEET_NAMES.competitor },
+];
+
+const STATES = [
+  "Andhra Pradesh","Delhi","Karnataka","Kerala",
+  "Maharashtra","Odisha","Tamil Nadu","Telangana","West Bengal",
+];
+
+const SECTIONS = [
+  {
+    id: "basics", title: "Store details", subtitle: "Tell us about the store you're visiting",
+    fields: [
+      { key: "auditor_name", label: "Your name",                    type: "text",    placeholder: "e.g. Priya Sharma",            required: true },
+      { key: "date",         label: "Date of visit",                type: "date",    placeholder: "",                             required: true },
+      { key: "city",         label: "City",                         type: "text",    placeholder: "e.g. Kolkata",                 required: true },
+      { key: "state",        label: "State",                        type: "select",  options: STATES,                             required: true },
+      { key: "store_name",   label: "Mall / Store name",            type: "text",    placeholder: "e.g. Purplle, South City Mall", required: true },
+      { key: "store_type",   label: "Store type",                   type: "text",    placeholder: "",                             required: true },
+      { key: "crowd_level",  label: "Crowd level at time of visit", type: "select",  options: ["Empty","Light","Moderate","Busy","Very busy"], required: true },
+    ],
+  },
+  {
+    id: "ambiance", title: "Ambiance & sensory", subtitle: "Describe and rate what you experienced",
+    fields: [
+      { key: "lighting_quality", label: "Lighting quality",  type: "textarea", placeholder: "Warm, cool, flattering, harsh, dim...", required: true },
+      { key: "lighting_rating",  label: "Lighting rating",   type: "rating",   anchors: ["Dim / unflattering","Functional","Bright & enhances products"], required: true },
+      { key: "fragrance_appeal", label: "Fragrance appeal",  type: "textarea", placeholder: "Was there a scent? Describe it...",      required: true },
+      { key: "fragrance_rating", label: "Fragrance rating",  type: "rating",   anchors: ["Unpleasant / strong","Neutral","Pleasant & subtle"], required: true },
+      { key: "music_fit",        label: "Music fit",         type: "textarea", placeholder: "Genre, volume, did it suit the brand?",  required: true },
+      { key: "music_rating",     label: "Music rating",      type: "rating",   anchors: ["Distracting","Okay","Enhances vibe"],        required: true },
+    ],
+  },
+  {
+    id: "navigation", title: "Navigation & layout", subtitle: "How easy was it to move around?",
+    fields: [
+      { key: "ease_of_navigation",      label: "Ease of navigation",      type: "textarea", placeholder: "Was the store flow intuitive?",                       required: true },
+      { key: "navigation_rating",       label: "Navigation rating",       type: "rating",   anchors: ["Confusing","Manageable","Effortless"],                   required: true },
+      { key: "layout_clarity",          label: "Layout clarity",          type: "textarea", placeholder: "Were zones or sections clearly defined?",             required: true },
+      { key: "product_discoverability", label: "Product discoverability", type: "textarea", placeholder: "How easy was it to find what you were looking for?",  required: true },
+    ],
+  },
+  {
+    id: "staff", title: "BA & staff", subtitle: "How was the human element?",
+    fields: [
+      { key: "ba_grooming",        label: "BA grooming",        type: "textarea", placeholder: "How did staff present themselves?",         required: true },
+      { key: "ba_approachability", label: "BA approachability", type: "textarea", placeholder: "Were they welcoming and easy to approach?", required: true },
+      { key: "ba_knowledge",       label: "BA knowledge",       type: "textarea", placeholder: "Did they know the products well?",          required: true },
+    ],
+  },
+  {
+    id: "merchandising", title: "Merchandising", subtitle: "How well were products presented?",
+    fields: [
+      { key: "shelf_cleanliness",     label: "Shelf cleanliness",     type: "textarea", placeholder: "Tidy, dusty, overstocked, messy?",                       required: true },
+      { key: "brand_visibility",      label: "Brand visibility",      type: "textarea", placeholder: "Was the brand identity clear on shelf?",                 required: true },
+      { key: "communication_clarity", label: "Communication clarity", type: "textarea", placeholder: "Signs, pricing tags, POS material — clear or confusing?",required: true },
+      { key: "product_highlighting",  label: "Product highlighting",  type: "textarea", placeholder: "Were hero or new products given prominence?",             required: true },
+    ],
+  },
+  {
+    id: "impressions", title: "Overall impressions", subtitle: "Step back and reflect — be honest",
+    fields: [
+      { key: "first_impression", label: "First impression",                             type: "textarea", placeholder: "What hit you the moment you walked in?",             required: true },
+      { key: "what_felt_off",    label: "What felt off?",                               type: "textarea", placeholder: "Design, layout, service, anything that didn't work...", required: true },
+      { key: "what_worked_well", label: "What worked well?",                            type: "textarea", placeholder: "What genuinely stood out positively?",                required: true },
+      { key: "most_memorable",   label: "Most memorable element",                       type: "text",     placeholder: "One thing you'll remember most",                     required: true },
+      { key: "would_shop_here",  label: "Would you want to shop here? Yes / No & why?", type: "textarea", placeholder: "Be direct!",                                          required: true },
+      { key: "notes",            label: "Notes",                                        type: "textarea", placeholder: "Anything else worth capturing...",                    required: false },
+    ],
+  },
+];
+
+const TOTAL = SECTIONS.length;
+
+// ─── Rating field ────────────────────────────────────────────
+function RatingField({ label, anchors, value, onChange, invalid, required }) {
+  return React.createElement("div", { style: { marginBottom: "2.5rem" } },
+    React.createElement("p", {
+      style: { fontSize: 14, fontWeight: 500, color: INK, margin: "0 0 14px" }
+    },
+      label,
+      required && React.createElement("span", { style: { color: ACCENT, marginLeft: 4 } }, "*")
+    ),
+    React.createElement("div", { style: { display: "flex", gap: 8, justifyContent: "center", margin: "0 0 10px" } },
+      [1,2,3,4,5].map(n =>
+        React.createElement("button", {
+          key: n,
+          onClick: () => onChange(n),
+          style: {
+            width: 48, height: 48, borderRadius: "50%",
+            border: value === n ? `1.5px solid ${INK}` : `1px solid ${invalid ? INK : BORDER}`,
+            background: value === n ? ACCENT : SURFACE,
+            color: MUTED,
+            fontSize: 14, fontWeight: value === n ? 500 : 300,
+            cursor: "pointer", transition: "all 0.15s",
+            fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+          }
+        }, n)
+      )
+    ),
+    React.createElement("div", {
+      style: { display: "flex", justifyContent: "space-between", fontSize: 11, color: MUTED, padding: "0 2px", fontWeight: 400 }
+    },
+      React.createElement("span", null, anchors[0]),
+      React.createElement("span", null, anchors[1]),
+      React.createElement("span", null, anchors[2]),
+    )
+  );
+}
+
+// ─── Main App ────────────────────────────────────────────────
+function App() {
+  const [category, setCategory] = useState(null);
+  const [step, setStep]         = useState(0);
+  const [data, setData]         = useState({});
+  const [showErrors, setShowErrors] = useState(false);
+  const [submitted, setSubmitted]   = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const set = (k, v) => setData(d => ({ ...d, [k]: v }));
+
+  const handleSelectCategory = (cat) => {
+    setCategory(cat);
+    setData({});
+    setStep(0);
+    setShowErrors(false);
+  };
+
+  const isMissing = f => {
+    if (!f.required) return false;
+    const v = data[f.key];
+    return f.type === "rating" ? !v : !v || String(v).trim() === "";
+  };
+
+  const sectionComplete = () => SECTIONS[step].fields.every(f => !isMissing(f));
+
+  const handleNext = async () => {
+    if (!sectionComplete()) { setShowErrors(true); return; }
+    setShowErrors(false);
+    if (step < TOTAL - 1) {
+      setStep(s => s + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    setSubmitting(true);
+    setSubmitError("");
+    const ordered = [
+      data.auditor_name, data.date, data.city, data.state,
+      data.store_name, data.store_type, data.crowd_level,
+      data.lighting_quality,  data.lighting_rating,
+      data.fragrance_appeal,  data.fragrance_rating,
+      data.music_fit,         data.music_rating,
+      data.ease_of_navigation, data.navigation_rating,
+      data.layout_clarity,    data.product_discoverability,
+      data.ba_grooming,       data.ba_approachability, data.ba_knowledge,
+      data.shelf_cleanliness, data.brand_visibility,
+      data.communication_clarity, data.product_highlighting,
+      data.first_impression,  data.what_felt_off, data.what_worked_well,
+      data.most_memorable,    data.would_shop_here,
+      "", data.notes,
+    ].map(v => v !== undefined && v !== null ? v : "");
+
+    try {
+      if (WEB_APP_URL === "PASTE_YOUR_APPS_SCRIPT_URL_HERE") {
+        await new Promise(r => setTimeout(r, 900));
+        setSubmitted(true);
+      } else {
+        // Apps Script doesn't support CORS from GitHub Pages.
+        // Use no-cors mode — we can't read the response but the data still lands in the sheet.
+        const params = new URLSearchParams();
+        params.append("payload", JSON.stringify({ values: ordered, sheet: category.sheet }));
+        await fetch(WEB_APP_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: params.toString(),
+        });
+        setSubmitted(true);
+      }
+    } catch (e) {
+      setSubmitError("Something went wrong. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Submitted ──────────────────────────────────────────────
+  if (submitted) {
+    return React.createElement("div", {
+      style: { minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "3rem 1.5rem", textAlign: "center", background: BG }
+    },
+      React.createElement("svg", { width: 40, height: 40, viewBox: "0 0 40 40", fill: "none", style: { marginBottom: 24 } },
+        React.createElement("circle", { cx: 20, cy: 20, r: 19, stroke: ACCENT, strokeWidth: 1 }),
+        React.createElement("polyline", { points: "11,21 18,28 29,14", stroke: ACCENT, strokeWidth: 1.5, strokeLinecap: "round", strokeLinejoin: "round" })
+      ),
+      React.createElement("p", { style: { fontSize: 12, color: MUTED, margin: "0 0 10px", fontWeight: 400 } }, "Store Signal"),
+      React.createElement("h2", { style: { fontSize: 26, fontWeight: 500, color: ACCENT, margin: "0 0 8px" } }, "Signal received."),
+      React.createElement("p", { style: { fontSize: 14, fontWeight: 400, color: MUTED, margin: "0 0 4px" } }, `${data.store_name}, ${data.city}`),
+      React.createElement("p", { style: { fontSize: 12, color: MUTED, margin: "0 0 4px", fontWeight: 400 } }, `Saved to: ${category.sheet}`),
+      React.createElement("p", { style: { fontSize: 12, color: MUTED, margin: "0 0 40px", fontWeight: 400 } }, `Submitted by ${data.auditor_name}`),
+      React.createElement("button", {
+        onClick: () => { setData({}); setStep(0); setSubmitted(false); setShowErrors(false); setCategory(null); },
+        style: { padding: "11px 28px", borderRadius: 2, border: `1px solid ${INK}`, background: "transparent", color: INK, fontSize: 13, fontWeight: 500, fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }
+      }, "Log another visit")
+    );
+  }
+
+  // ── Landing — category picker ──────────────────────────────
+  if (!category) {
+    return React.createElement("div", {
+      style: { maxWidth: 520, margin: "0 auto", padding: "3.5rem 1.5rem" }
+    },
+      React.createElement("p", { style: { fontSize: 12, color: MUTED, margin: "0 0 12px", fontWeight: 400 } }, "Purplle — Retail experience"),
+      React.createElement("h1", { style: { fontSize: 36, fontWeight: 500, color: ACCENT, margin: "0 0 8px", letterSpacing: "-0.5px" } }, "Store Signal"),
+      React.createElement("p", { style: { fontSize: 13, fontWeight: 400, color: MUTED, margin: "0 0 3rem" } }, "Read the store. Send the signal."),
+      React.createElement("p", { style: { fontSize: 12, fontWeight: 500, color: INK, margin: "0 0 16px" } }, "What type of store are you visiting?"),
+      STORE_CATEGORIES.map((cat, i) =>
+        React.createElement("div", {
+          key: cat.id,
+          className: "store-card",
+          onClick: () => handleSelectCategory(cat),
+        },
+          React.createElement("div", {
+            style: { width: 32, height: 32, borderRadius: "50%", background: ACCENT, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" },
+          },
+            React.createElement("span", { style: { fontSize: 12, fontWeight: 500, color: INK, fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' } }, i + 1)
+          ),
+          React.createElement("div", { style: { flex: 1 } },
+            React.createElement("p", { style: { fontSize: 14, fontWeight: 500, color: INK, margin: "0 0 2px" } }, cat.label),
+            React.createElement("p", { style: { fontSize: 12, fontWeight: 400, color: MUTED, margin: 0 } }, cat.description)
+          ),
+          React.createElement("span", { style: { color: MUTED, fontSize: 16, flexShrink: 0, fontWeight: 400 } }, "→")
+        )
+      )
+    );
+  }
+
+  // ── Form sections ──────────────────────────────────────────
+  const section = SECTIONS[step];
+  const pct = Math.round(((step + 1) / TOTAL) * 100);
+
+  const renderField = (field) => {
+    const missing = showErrors && isMissing(field);
+    if (field.type === "rating") {
+      return React.createElement(RatingField, {
+        key: field.key, label: field.label, anchors: field.anchors,
+        value: data[field.key], onChange: v => set(field.key, v),
+        invalid: missing, required: field.required,
+      });
+    }
+    const borderColor = missing ? INK : BORDER;
+    return React.createElement("div", { key: field.key, style: { marginBottom: "1.75rem" } },
+      React.createElement("label", {
+        style: { display: "block", fontSize: 14, fontWeight: 500, color: INK, marginBottom: 8 }
+      },
+        field.label,
+        field.required
+          ? React.createElement("span", { style: { color: ACCENT, marginLeft: 4 } }, "*")
+          : React.createElement("span", { style: { color: MUTED, fontSize: 12, marginLeft: 6, fontWeight: 400 } }, "Optional")
+      ),
+      field.type === "select"
+        ? React.createElement("select", {
+            value: data[field.key] || "",
+            onChange: e => set(field.key, e.target.value),
+            style: { borderColor, fontSize: 14, fontWeight: 400, color: MUTED },
+          },
+            React.createElement("option", { value: "" }, "Select..."),
+            field.options.map(o => React.createElement("option", { key: o, value: o }, o))
+          )
+        : field.type === "textarea"
+        ? React.createElement("textarea", {
+            rows: 3,
+            placeholder: field.placeholder,
+            value: data[field.key] || "",
+            onChange: e => set(field.key, e.target.value),
+            style: { borderColor, fontSize: 14, fontWeight: 400, color: MUTED },
+          })
+        : React.createElement("input", {
+            type: field.type || "text",
+            placeholder: field.placeholder,
+            value: data[field.key] || "",
+            onChange: e => set(field.key, e.target.value),
+            style: { borderColor, fontSize: 14, fontWeight: 400, color: MUTED },
+          }),
+      missing && React.createElement("p", { style: { fontSize: 12, color: INK, margin: "5px 0 0", fontWeight: 400 } }, "This field is required")
+    );
+  };
+
+  return React.createElement("div", { style: { maxWidth: 520, margin: "0 auto", paddingBottom: 120 } },
+    // Progress bar
+    React.createElement("div", { style: { height: 2, background: BORDER, position: "sticky", top: 0, zIndex: 10 } },
+      React.createElement("div", { style: { height: "100%", width: `${pct}%`, background: ACCENT, transition: "width 0.3s ease" } })
+    ),
+    // Category pill + change
+    React.createElement("div", {
+      style: { padding: "1rem 1.5rem 0", display: "flex", alignItems: "center", gap: 8 }
+    },
+      React.createElement("span", { style: { fontSize: 12, fontWeight: 500, color: MUTED } }, category.label),
+      React.createElement("span", { style: { fontSize: 12, color: MUTED, fontWeight: 400 } }, "—"),
+      React.createElement("button", {
+        onClick: () => { setCategory(null); setData({}); setStep(0); setShowErrors(false); },
+        style: { fontSize: 12, color: MUTED, background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 400, fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif', textDecoration: "underline" }
+      }, "Change")
+    ),
+    // Section content
+    React.createElement("div", { style: { padding: "2rem 1.5rem 0" } },
+      React.createElement("p", { style: { fontSize: 11, color: MUTED, margin: "0 0 8px", fontWeight: 400 } }, `${step + 1} of ${TOTAL}`),
+      React.createElement("h2", { style: { fontSize: 22, fontWeight: 500, color: ACCENT, margin: "0 0 6px" } }, section.title),
+      React.createElement("p", { style: { fontSize: 13, fontWeight: 400, color: MUTED, margin: "0 0 2.5rem" } }, section.subtitle),
+      ...section.fields.map(renderField),
+      showErrors && !sectionComplete() && React.createElement("p", { style: { fontSize: 12, color: INK, margin: "0 0 1rem", fontWeight: 400 } }, "Please fill in all required fields before continuing."),
+      submitError && React.createElement("p", { style: { fontSize: 12, color: INK, margin: "0 0 1rem", fontWeight: 400 } }, submitError),
+    ),
+    // Navigation
+    React.createElement("div", {
+      style: { position: "fixed", bottom: 0, left: 0, right: 0, background: SURFACE, borderTop: `1px solid ${BORDER}`, padding: "1rem 1.5rem", display: "flex", gap: 10, maxWidth: 520, margin: "0 auto" }
+    },
+      step > 0 && React.createElement("button", {
+        onClick: () => { setStep(s => s - 1); setShowErrors(false); window.scrollTo({ top: 0, behavior: "smooth" }); },
+        style: { padding: "12px 20px", borderRadius: 2, border: `1px solid ${BORDER}`, background: "transparent", color: INK, fontWeight: 400, fontSize: 13, fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif' }
+      }, "Back"),
+      React.createElement("button", {
+        onClick: handleNext,
+        disabled: submitting,
+        style: {
+          flex: 1, padding: "13px 20px", borderRadius: 2, border: "none",
+          background: submitting ? BORDER : INK,
+          color: BG, fontWeight: 500, fontSize: 14,
+          cursor: submitting ? "default" : "pointer",
+          transition: "background 0.2s",
+          fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+        }
+      }, submitting ? "Submitting..." : step === TOTAL - 1 ? "Submit visit" : "Continue")
+    )
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById("root"));
+</script>
+</body>
+</html>
